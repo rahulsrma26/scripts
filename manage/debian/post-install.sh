@@ -3,7 +3,7 @@ apt update
 apt install sudo -y
 
 read -p "Enter sudo username (e.g. admin): " USERNAME
-adduser ${USERNAME}
+adduser --gecos "" ${USERNAME}
 usermod -aG sudo ${USERNAME}
 
 read -p "Enter ip/subnet (e.g. 192.168.0.10/24): " ADDRESS
