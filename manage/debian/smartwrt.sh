@@ -117,12 +117,13 @@ for DEVICE in "${DEVICES[@]}"; do
         LAST_RECORD=$(grep "$DEVICE" "$OUTPUT_FILE" | tail -n 1)
         if [[ -n $LAST_RECORD ]]; then
             LAST_TIMESTAMP=$(echo "$LAST_RECORD" | awk '{print $1}')
+            LAST_RECORD_TIME=$(date -d @"$LAST_TIMESTAMP" +"%Y-%m-%d %H:%M:%S")
             LAST_BYTES=$(echo "$LAST_RECORD" | awk '{print $6}')
             BYTES_DIFF=$((TOTAL_BYTES - LAST_BYTES))
             TIME_DIFF=$((NOW - LAST_TIMESTAMP))
             SPEED=$((BYTES_DIFF / TIME_DIFF))
             SIMPLIFIED_BYTES_DIFF=$(simplify_units $BYTES_DIFF)
-            echo "Bytes since last record: $BYTES_DIFF ($SIMPLIFIED_BYTES_DIFF)"
+            echo "Bytes written: $BYTES_DIFF ($SIMPLIFIED_BYTES_DIFF) since $LAST_RECORD_TIME"
             DAY=$((24 * 3600 * BYTES_DIFF / TIME_DIFF))
             SIMPLIFIED_DAY=$(simplify_units $DAY)
             echo "Speed: $SPEED B/s (Estimated day writes: $SIMPLIFIED_DAY)"
