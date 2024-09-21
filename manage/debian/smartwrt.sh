@@ -2,13 +2,17 @@
 
 # Function to display the help message
 show_help() {
-    echo "Usage: $0 [-d device_name] [-h]"
+    echo "Usage: $0 [options]"
     echo
     echo "Options:"
-    echo "  -d device_name   Specify the device to check (e.g., sda, nvme0n1)."
-    echo "                   If not specified, the script will check all available disk devices."
-    echo "  -s               Save the output to a file with timestamp."
-    echo "  -h               Show this help message."
+    echo "  -d devices  Specify the device(s) to check (e.g., sda, nvme0n1)."
+    echo "              Multiple devices can be separated by commas (without space)."
+    echo "              If not specified, the script will check all available disk devices."
+    echo "  -s          Save the output to a file with timestamp."
+    echo "  -a          Add daily cron job."
+    echo "  -r          Remove daily cron job."
+    echo "  -c          Clear the history."
+    echo "  -h          Show this help message."
     echo
 }
 
@@ -38,17 +42,24 @@ simplify_units() {
 
 # Initialize variables
 OUTPUT_FILE="$HOME/.smart_logs/written.log"
-mkdir -p "$(dirname "$OUTPUT_FILE")"
+CRON_COMMAND="$0 -s"
 
-SPECIFIED_DEVICE=""
+SPECIFIED_DEVICES=""
 SAVE_OUTPUT=0
 SHOW_HELP=0
+ASK_SETUP_CRON=0
+CRON_ADD=0
+CRON_REMOVE=0
+CLEAR_HIST=0
 
 # Parse command-line arguments
-while getopts "d:sh" opt; do
+while getopts "d:sarch" opt; do
     case "$opt" in
-        d) SPECIFIED_DEVICE="$OPTARG" ;;
+        d) SPECIFIED_DEVICES="$OPTARG" ;;
         s) SAVE_OUTPUT=1 ;;
+        a) CRON_ADD=1 ;;
+        r) CRON_REMOVE=1 ;;
+        c) CLEAR_HIST=1 ;;
         h) SHOW_HELP=1 ;;
         *) show_help
            exit 1 ;;
@@ -61,24 +72,87 @@ if [[ $SHOW_HELP -eq 1 ]]; then
     exit 0
 fi
 
+# check if both -a and -r are set
+if [[ $CRON_ADD -eq 1 && $CRON_REMOVE -eq 1 ]]; then
+    echo "Error: Cannot add and remove cron job at the same time."
+    show_help
+    exit 1
+fi
+
+if [[ ! -f "$OUTPUT_FILE" && $CRON_EXISTS -eq 0 ]]; then
+    ASK_SETUP_CRON=1
+    mkdir -p "$(dirname "$OUTPUT_FILE")"
+    touch "$OUTPUT_FILE"
+fi
+
+if [[ $ASK_SETUP_CRON -eq 1 ]]; then
+    echo "Do you want to set up a daily cron job? (yes/no): "
+    read -r ANS
+    ANS=$(echo "$ANS" | tr '[:upper:]' '[:lower:]')
+
+    if [[ "$ANS" == "yes" || "$ANS" == "y" ]]; then
+        CRON_ADD=1
+        CRON_REMOVE=0
+    else
+        echo "Daily cron job not set up. Skipping..."
+    fi
+fi
+
+if [[ $CRON_ADD -eq 1 || $CRON_REMOVE -eq 1 ]]; then
+    CRON_EXISTS=$(crontab -l | grep -c "$CRON_COMMAND")
+fi
+
+if [[ $CRON_REMOVE -eq 1 ]]; then
+    if [[ $CRON_EXISTS -eq 1 ]]; then
+        # Remove the cron job from the crontab
+        crontab -l | grep -v "$CRON_COMMAND" | crontab -
+        echo "Daily cron job has been removed."
+    else
+        echo "Daily cron job not found. Skipping..."
+    fi
+fi
+
+if [[ $CRON_ADD -eq 1 ]]; then
+    if [[ $CRON_EXISTS -eq 0 ]]; then
+        # Add the cron job to the crontab
+        (crontab -l 2>/dev/null; echo "0 0 * * * $CRON_COMMAND") | crontab -
+        echo "Daily cron job has been added."
+    else
+        echo "Daily cron job already exists. Skipping..."
+    fi
+fi
+
+if [[ $CLEAR_HIST -eq 1 ]]; then
+    echo "Clearing the history..."
+    echo -n > "$OUTPUT_FILE"
+fi
+
 # Get all devices
 DEVICES=$(lsblk -d -o NAME,TYPE | grep disk | awk '{print $1}')
 
-# If a device is specified, check if it exists
-if [[ -n $SPECIFIED_DEVICE ]]; then
-    if [[ $DEVICES != *$SPECIFIED_DEVICE* ]]; then
-        echo "Device $SPECIFIED_DEVICE not found"
-        exit 1
-    fi
-    DEVICES=("$SPECIFIED_DEVICE")
+if [[ -z $SPECIFIED_DEVICES ]]; then
+    # shellcheck disable=SC2206
+    SPECIFIED_DEVICES=($DEVICES)
+else
+    IFS=',' read -r -a SPECIFIED_DEVICES <<< "${SPECIFIED_DEVICES[@]}"
 fi
 
-for DEVICE in "${DEVICES[@]}"; do
+for DEVICE in "${SPECIFIED_DEVICES[@]}"; do
     TOTAL_BYTES=0
+    echo "----------------------------------------"
+    if [[ $(echo "$DEVICES" | grep -c "$DEVICE") -eq 0 ]]; then
+        echo "Device $DEVICE not found. Skipping..."
+        continue
+    fi
     if [[ $DEVICE == sd* ]]; then
         SMART=$(smartctl -a "/dev/$DEVICE")
         # check using smartctl where the device is SSD or not
-        IS_SSD=$(echo "$SMART" | grep "Rotation Rate" | grep -c "Solid State")
+        ROTATION=$(echo "$SMART" | grep "Rotation Rate")
+        if [[ -z $ROTATION ]]; then
+            echo "Device $DEVICE not recognized. Skipping..."
+            continue
+        fi
+        IS_SSD=$(echo "$ROTATION" | grep -c "Solid State")
         if [[ $IS_SSD -eq 1 ]]; then
             IS_SSD="SSD"
         else
@@ -108,7 +182,7 @@ for DEVICE in "${DEVICES[@]}"; do
         echo "Data units written: $UNITS_WRITTEN"
         TOTAL_BYTES=$((UNITS_WRITTEN * SECTOR_SIZE))
     else
-        echo "Unknown device type"
+        echo "Unsupported device type $DEVICE. Skipping..."
     fi
     if [[ $TOTAL_BYTES -gt 0 ]]; then
         SIMPLIFIED_BYTES=$(simplify_units $TOTAL_BYTES)
