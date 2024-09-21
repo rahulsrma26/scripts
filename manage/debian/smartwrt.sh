@@ -114,6 +114,9 @@ fi
 
 if [[ $CRON_ADD -eq 1 ]]; then
     if [[ $CRON_EXISTS -eq 0 ]]; then
+        if [[ -n $SPECIFIED_DEVICES ]]; then
+            CRON_COMMAND="$CRON_COMMAND -d $SPECIFIED_DEVICES"
+        fi
         # Add the cron job to the crontab
         (crontab -l 2>/dev/null; echo "0 0 * * * $CRON_COMMAND") | crontab -
         echo "Daily cron job has been added."
