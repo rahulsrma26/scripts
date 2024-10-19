@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Download and install the script:
+# curl -o /usr/local/sbin/smartwrt  https://github.com/rahulsrma26/scripts/raw/main/manage/debian/smartwrt.sh
+# chmod +x /usr/local/sbin/smartwrt
+
 # Function to display the help message
 show_help() {
     echo "Usage: $0 [options]"
@@ -157,12 +161,12 @@ for DEVICE in "${SPECIFIED_DEVICES[@]}"; do
         fi
         IS_SSD=$(echo "$ROTATION" | grep -c "Solid State")
         if [[ $IS_SSD -eq 1 ]]; then
-            IS_SSD="SSD"
+            DEVICE_TYPE="SSD"
         else
-            IS_SSD="HDD"
+            DEVICE_TYPE="HDD"
         fi
         SECTOR_SIZE=$(echo "$SMART" | grep "Sector Size" | head -n 1 | awk '{print $3}')
-        echo "Device: $DEVICE (Type: $IS_SSD); Sector size: $SECTOR_SIZE"
+        printf 'Device: %s\nType: %s\nSector size: %s\n' "$DEVICE" "$DEVICE_TYPE" "$SECTOR_SIZE"
         UNITS_WRITTEN=$(echo "$SMART" | grep "Total_LBAs_Written"| tail -n 1 | awk '{print $NF}')
         if [[ $UNITS_WRITTEN -gt 0 ]]; then
             echo "Total LBAs written: $UNITS_WRITTEN"
@@ -178,9 +182,9 @@ for DEVICE in "${SPECIFIED_DEVICES[@]}"; do
         fi
     elif [[ $DEVICE == nvme* ]]; then
         SMART=$(smartctl -a "/dev/$DEVICE")
-        IS_SSD="NVME"
+        DEVICE_TYPE="NVME"
         SECTOR_SIZE=$(echo "$SMART" | grep "LBA Size" | head -n 1 | awk '{print $NF}')
-        echo "Device: $DEVICE (Type: $IS_SSD); Sector size: $SECTOR_SIZE"
+        printf 'Device: %s\nType: %s\nSector size: %s\n' "$DEVICE" "$DEVICE_TYPE" "$SECTOR_SIZE"
         UNITS_WRITTEN=$(echo "$SMART" | grep "Data Units Written" | tail -n 1 | awk '{print $4}' | sed 's/,//g')
         echo "Data units written: $UNITS_WRITTEN"
         TOTAL_BYTES=$((UNITS_WRITTEN * SECTOR_SIZE))
@@ -206,7 +210,7 @@ for DEVICE in "${SPECIFIED_DEVICES[@]}"; do
             echo "Speed: $SPEED B/s (Estimated day writes: $SIMPLIFIED_DAY)"
         fi
         if [[ $SAVE_OUTPUT -eq 1 ]]; then
-            echo "$NOW $DEVICE $IS_SSD $SECTOR_SIZE $UNITS_WRITTEN $TOTAL_BYTES" >> "$OUTPUT_FILE"
+            echo "$NOW $DEVICE $DEVICE_TYPE $SECTOR_SIZE $UNITS_WRITTEN $TOTAL_BYTES" >> "$OUTPUT_FILE"
             echo "[Saved]"
         fi
     fi
