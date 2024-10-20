@@ -1,11 +1,14 @@
 #!/bin/bash
 
 # Download and install the script:
-# curl -o /usr/local/sbin/smartwrt  https://github.com/rahulsrma26/scripts/raw/main/manage/debian/smartwrt.sh
+# curl -o /usr/local/sbin/smartwrt https://github.com/rahulsrma26/scripts/raw/main/manage/debian/smartwrt.sh
 # chmod +x /usr/local/sbin/smartwrt
 
 # Function to display the help message
 show_help() {
+    echo "smartwrt - A script to check the total bytes written on SSDs and NVMe drives."
+    echo "version: 1.1.0"
+    echo
     echo "Usage: $0 [options]"
     echo
     echo "Options:"
@@ -187,7 +190,7 @@ for DEVICE in "${SPECIFIED_DEVICES[@]}"; do
         printf 'Device: %s\nType: %s\nSector size: %s\n' "$DEVICE" "$DEVICE_TYPE" "$SECTOR_SIZE"
         UNITS_WRITTEN=$(echo "$SMART" | grep "Data Units Written" | tail -n 1 | awk '{print $4}' | sed 's/,//g')
         echo "Data units written: $UNITS_WRITTEN"
-        TOTAL_BYTES=$((UNITS_WRITTEN * SECTOR_SIZE))
+        TOTAL_BYTES=$((UNITS_WRITTEN * SECTOR_SIZE * 1000))
     else
         echo "Unsupported device type $DEVICE. Skipping..."
     fi
