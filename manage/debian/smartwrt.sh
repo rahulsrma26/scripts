@@ -7,7 +7,7 @@
 # Function to display the help message
 show_help() {
     echo "smartwrt - A script to check the total bytes written on SSDs and NVMe drives."
-    echo "version: 1.1.0"
+    echo "version: 1.2.0"
     echo
     echo "Usage: $0 [options]"
     echo
@@ -15,8 +15,9 @@ show_help() {
     echo "  -d devices  Specify the device(s) to check (e.g., sda, nvme0n1)."
     echo "              Multiple devices can be separated by commas (without space)."
     echo "              If not specified, the script will check all available disk devices."
+    echo "  -l          List all supported device(s)."
     echo "  -s          Save the output to a file with timestamp."
-    echo "  -a          Add daily cron job."
+    echo "  -a          Add daily cron job to save the output."
     echo "  -r          Remove daily cron job."
     echo "  -c          Clear the history."
     echo "  -h          Show this help message."
@@ -52,6 +53,7 @@ OUTPUT_FILE="$HOME/.smart_logs/written.log"
 CRON_COMMAND="$0 -s"
 
 SPECIFIED_DEVICES=""
+LIST_DEVICES=0
 SAVE_OUTPUT=0
 SHOW_HELP=0
 ASK_SETUP_CRON=0
@@ -60,9 +62,10 @@ CRON_REMOVE=0
 CLEAR_HIST=0
 
 # Parse command-line arguments
-while getopts "d:sarch" opt; do
+while getopts "d:lsarch" opt; do
     case "$opt" in
         d) SPECIFIED_DEVICES="$OPTARG" ;;
+        l) LIST_DEVICES=1 ;;
         s) SAVE_OUTPUT=1 ;;
         a) CRON_ADD=1 ;;
         r) CRON_REMOVE=1 ;;
@@ -76,6 +79,13 @@ done
 # Show help if the -h flag is set
 if [[ $SHOW_HELP -eq 1 ]]; then
     show_help
+    exit 0
+fi
+
+# List all supported devices
+if [[ $LIST_DEVICES -eq 1 ]]; then
+    DEVICES=$(smartctl --scan | awk '{print $1}' | grep -E "sd|nvme" | sed 's/\/dev\///g')
+    echo "Supported device(s): $DEVICES" | tr '\n' ',' | sed 's/,$/\n/'
     exit 0
 fi
 
