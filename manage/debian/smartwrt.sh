@@ -4,10 +4,14 @@
 # curl -o /usr/local/sbin/smartwrt https://github.com/rahulsrma26/scripts/raw/main/manage/debian/smartwrt.sh
 # chmod +x /usr/local/sbin/smartwrt
 
+# take output file from ENV or use default
+DEFAULT_OUTPUT_FILE="$HOME/.smartwrt/log.txt"
+OUTPUT_FILE="${SMARTWRT_OUTPUT_FILE:-$DEFAULT_OUTPUT_FILE}"
+
 # Function to display the help message
 show_help() {
     echo "smartwrt - A script to check the total bytes written on SSDs and NVMe drives."
-    echo "version: 1.2.0"
+    echo "version: 1.3.1"
     echo
     echo "Usage: $0 [options]"
     echo
@@ -16,7 +20,7 @@ show_help() {
     echo "              Multiple devices can be separated by commas (without space)."
     echo "              If not specified, the script will check all available disk devices."
     echo "  -l          List all supported device(s)."
-    echo "  -s          Save the output to a file with timestamp."
+    echo "  -s          Save the output to a file ($OUTPUT_FILE)"
     echo "  -a          Add daily cron job to save the output."
     echo "  -r          Remove daily cron job."
     echo "  -c          Clear the history."
@@ -49,7 +53,6 @@ simplify_units() {
 }
 
 # Initialize variables
-OUTPUT_FILE="$HOME/.smart_logs/written.log"
 CRON_COMMAND="$0 -s"
 
 SPECIFIED_DEVICES=""
