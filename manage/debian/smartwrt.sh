@@ -11,7 +11,7 @@ OUTPUT_FILE="${SMARTWRT_OUTPUT_FILE:-$DEFAULT_OUTPUT_FILE}"
 # Function to display the help message
 show_help() {
     echo "smartwrt - A script to check the total bytes written on SSDs and NVMe drives."
-    echo "version: 1.3.2"
+    echo "version: 1.4.0"
     echo
     echo "Usage: $0 [options]"
     echo
@@ -28,26 +28,26 @@ show_help() {
     echo
 }
 
-UNIT_SCALE=$((1024 * 10))
+UNIT_SCALE=$((1000 * 10))
 simplify_units() {
     local VALUE=$1
     local UNIT="B"
     local RESULT=$VALUE
     if [[ $RESULT -gt $UNIT_SCALE ]]; then
-        RESULT=$((RESULT / 1024))
-        UNIT="KiB"
+        RESULT=$((RESULT / 1000))
+        UNIT="KB"
     fi
     if [[ $RESULT -gt $UNIT_SCALE ]]; then
-        RESULT=$((RESULT / 1024))
-        UNIT="MiB"
+        RESULT=$((RESULT / 1000))
+        UNIT="MB"
     fi
     if [[ $RESULT -gt $UNIT_SCALE ]]; then
-        RESULT=$((RESULT / 1024))
-        UNIT="GiB"
+        RESULT=$((RESULT / 1000))
+        UNIT="GB"
     fi
     if [[ $RESULT -gt $UNIT_SCALE ]]; then
-        RESULT=$((RESULT / 1024))
-        UNIT="TiB"
+        RESULT=$((RESULT / 1000))
+        UNIT="TB"
     fi
     echo "$RESULT $UNIT"
 }
