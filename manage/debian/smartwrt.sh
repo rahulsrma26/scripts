@@ -11,7 +11,7 @@ OUTPUT_FILE="${SMARTWRT_OUTPUT_FILE:-$DEFAULT_OUTPUT_FILE}"
 # Function to display the help message
 show_help() {
     echo "smartwrt - A script to check the total bytes written on SSDs and NVMe drives."
-    echo "version: 1.3.1"
+    echo "version: 1.3.2"
     echo
     echo "Usage: $0 [options]"
     echo
@@ -203,7 +203,7 @@ for DEVICE in "${SPECIFIED_DEVICES[@]}"; do
         printf 'Device: %s\nType: %s\nSector size: %s\n' "$DEVICE" "$DEVICE_TYPE" "$SECTOR_SIZE"
         UNITS_WRITTEN=$(echo "$SMART" | grep "Data Units Written" | tail -n 1 | awk '{print $4}' | sed 's/,//g')
         echo "Data units written: $UNITS_WRITTEN"
-        TOTAL_BYTES=$((UNITS_WRITTEN * SECTOR_SIZE * 1000))
+        TOTAL_BYTES=$((UNITS_WRITTEN * 512 * 1000))
     else
         echo "Unsupported device type $DEVICE. Skipping..."
     fi
