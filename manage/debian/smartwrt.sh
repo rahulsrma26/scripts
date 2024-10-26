@@ -11,7 +11,7 @@ OUTPUT_FILE="${SMARTWRT_OUTPUT_FILE:-$DEFAULT_OUTPUT_FILE}"
 # Function to display the help message
 show_help() {
     echo "smartwrt - A script to check the total bytes written on SSDs and NVMe drives."
-    echo "version: 1.4.0"
+    echo "version: 1.5.0"
     echo
     echo "Usage: $0 [options]"
     echo
@@ -87,7 +87,7 @@ fi
 
 # List all supported devices
 if [[ $LIST_DEVICES -eq 1 ]]; then
-    DEVICES=$(smartctl --scan | awk '{print $1}' | grep -E "sd|nvme" | sed 's/\/dev\///g')
+    DEVICES=$(/usr/sbin/smartctl --scan | awk '{print $1}' | grep -E "sd|nvme" | sed 's/\/dev\///g')
     echo "Supported device(s): $DEVICES" | tr '\n' ',' | sed 's/,$/\n/'
     exit 0
 fi
@@ -168,7 +168,7 @@ for DEVICE in "${SPECIFIED_DEVICES[@]}"; do
         continue
     fi
     if [[ $DEVICE == sd* ]]; then
-        SMART=$(smartctl -a "/dev/$DEVICE")
+        SMART=$(/usr/sbin/smartctl -a "/dev/$DEVICE")
         # check using smartctl where the device is SSD or not
         ROTATION=$(echo "$SMART" | grep "Rotation Rate")
         if [[ -z $ROTATION ]]; then
@@ -197,7 +197,7 @@ for DEVICE in "${SPECIFIED_DEVICES[@]}"; do
             fi
         fi
     elif [[ $DEVICE == nvme* ]]; then
-        SMART=$(smartctl -a "/dev/$DEVICE")
+        SMART=$(/usr/sbin/smartctl -a "/dev/$DEVICE")
         DEVICE_TYPE="NVME"
         SECTOR_SIZE=$(echo "$SMART" | grep "LBA Size" | head -n 1 | awk '{print $NF}')
         printf 'Device: %s\nType: %s\nSector size: %s\n' "$DEVICE" "$DEVICE_TYPE" "$SECTOR_SIZE"
