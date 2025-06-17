@@ -1,0 +1,487 @@
+blueprint:
+  name: Day/Night Cycle with Event Trigger
+  description: >
+    # Day/Night Cycle with Event Trigger
+
+    **Version: 0.3.4**
+
+    This automation allows you to control the day/night cycle based on sun elevation or specific times, with an optional event trigger for additional actions.
+
+    <details>
+    <summary><b>How This Automation Works:</b> - Click to expand</summary>
+
+    - **Day/Night Mode:**
+      - Automatically switches between day and night modes using either sun elevation or specific times.
+      - Runs configured scenes/scripts and controls lights/switches for each mode.
+
+    - **Event Trigger:**
+      - When the event entity (e.g., doorbell, motion sensor) turns ON, runs the configured event scenes/scripts and turns on event lights/switches.
+      - When the event entity turns OFF, runs the configured "event end" scenes/scripts and turns off event lights/switches after an optional delay.
+
+    - **Manual Reset:**
+      - Supports a manual event (`smart_home_fix_request`) to re-apply the correct mode after Home Assistant restarts or for troubleshooting.
+
+    - **Flexible Configuration:**
+      - Supports both sun and time triggers for day/night switching.
+      - Allows separate configuration for scenes/scripts and lights/switches for day, night, and event triggers.
+
+    </details>
+    Required = *
+
+  author: rahulsrma26
+  domain: automation
+  input:
+    day_night_trigger:
+      name: Define Day/Night
+      icon: mdi:theme-light-dark
+      description: >
+        This section allows you to configure the day/night cycle.
+        You can set up triggers based on sun elevation or specific times.
+      collapsed: true
+      input:
+        cycle_type:
+          name: Day Night Cycle Type *
+          description: Defines what is day/night cycle based on sun elevation or time.
+          selector:
+            select:
+              options:
+                - label: Night will be Start <= Current < End Time
+                  value: "time_enabled"
+                - label: Night will be Current < Cutoff elevation
+                  value: "sun_enabled"
+                - label: Night will be Start Time <= Current or Current < Sun elevation
+                  value: "start_time_sun_enabled"
+                - label: Night will be Current < Sun elevation and Current < End Time
+                  value: "end_time_sun_enabled"
+        start_time:
+          name: Start Time
+          description: Set the time for Start Time (for option 1 and 3)
+          default: "06:00:00"
+          selector:
+            time:
+        end_time:
+          name: End Time
+          description: Set the time for End Time (for option 1 and 4)
+          default: "22:00:00"
+          selector:
+            time:
+        cutoff_elevation:
+          name: Sun elevation to determine night (for option 2, 3 and 4)
+          description:
+            The sun elevation falling refers to the angle between the sun and the horizon when the sun is setting.
+            A negative value indicates that the sun is BELOW the horizon. For example, a setting guide of -1.5 corresponds to dusk.
+          default: -1.5
+          selector:
+            number:
+              min: -20
+              max: 20
+              step: 0.5
+              unit_of_measurement: degrees
+    dau_night_entities:
+      name: Day/Night Entities
+      icon: mdi:lightbulb-group
+      description: >
+        This section allows you to configure the entities that will be controlled during the day/night cycle.
+      collapsed: true
+      input:
+        day_entities:
+          name: Day Lights/Switches/Scene/Scripts
+          description: >
+            Lights/Switches to turn **ON** during the day and turn **OFF** during the night.
+            Scene/Scripts to run for the day state.
+          default: []
+          selector:
+            target:
+              entity:
+                domain:
+                  - light
+                  - switch
+                  - scene
+                  - script
+        night_entities:
+          name: Night Lights/Switchess/Scene/Scripts
+          description: >
+            Lights/Switches to turn **ON** during the night and turn **OFF** during the day.
+            Scene/Scripts to run for the night state.
+          default: []
+          selector:
+            target:
+              entity:
+                domain:
+                  - light
+                  - switch
+                  - scene
+                  - script
+    event_trigger:
+      name: Event Trigger (Optional)
+      description: >
+        This section allows you to configure event triggers for the automation.
+        You can set up triggers based on binary sensors, motion sensors, or any other entity that supports state changes.
+        When the event is triggered, it will run the specified scenes/scripts and control the lights/switches.
+      icon: mdi:motion-sensor
+      collapsed: true
+      input:
+        event_sensor:
+          name: Trigger Entity
+          description: >
+            Select the entity that will trigger the automation.
+            This can be a binary sensor, motion sensor, or any other entity that supports state changes.
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain: binary_sensor
+        event_trigger_mode:
+          name: Event Trigger Mode
+          description: >
+            Select the mode for the event trigger.
+            You can choose to trigger on day, night, or both modes.
+          default: "both_enabled"
+          selector:
+            select:
+              options:
+                - label: Only trigger on Day
+                  value: "day_enabled"
+                - label: Only trigger on Night
+                  value: "night_enabled"
+                - label: Trigger on both Day and Night
+                  value: "both_enabled"
+        event_start_scene_scripts:
+          name: Event Start Scene/Scripts
+          description: Scene/Scripts to run when the binary sensor is turned on
+          default: []
+          selector:
+            target:
+              entity:
+                domain:
+                  - scene
+                  - script
+        event_end_scene_scripts:
+          name: Event End Scene/Scripts
+          description: Scene/Scripts to run when the binary sensor is turned off
+          default: []
+          selector:
+            target:
+              entity:
+                domain:
+                  - scene
+                  - script
+        event_lights_switches:
+          name: Lights/Switches to Control
+          description: Lights/Switches to turn on/run when binary sensor is turned on and turn off when binary sensor is turned off.
+          default: []
+          selector:
+            target:
+              entity:
+                domain:
+                  - light
+                  - switch
+        event_duration_extension:
+          name: Event Duration Extension
+          description: >
+            When the event is off for a certain period, the automation will be back to day/night mode.
+            This is useful for keeping the lights on longer after the event has ended.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 60
+              unit_of_measurement: minutes
+    other_options:
+      name: Other Options
+      icon: mdi:cog-outline
+      description: >
+        Additional options for the automation.
+      collapsed: true
+      input:
+        fix_event_name:
+          name: Fix Event Name
+          description: >
+            This option can be used to trigger based on custom event to fix when the automation is restarted.
+            It ensures that the event trigger is set correctly based on the current time and sun elevation.
+          default: "smart_home_fix_request"
+          selector:
+            text:
+
+mode: restart
+max_exceeded: silent
+
+triggers:
+  - trigger: event
+    event_type: !input fix_event_name
+    id: "t_reset"
+  - trigger: numeric_state
+    id: "t_above_elevation"
+    entity_id: sun.sun
+    attribute: elevation
+    above: !input cutoff_elevation
+  - trigger: numeric_state
+    id: "t_below_elevation"
+    entity_id: sun.sun
+    attribute: elevation
+    below: !input cutoff_elevation
+  - trigger: time
+    id: "t_start_time"
+    at: !input start_time
+  - trigger: time
+    id: "t_end_time"
+    at: !input end_time
+  - trigger: state
+    id: "t_event_on"
+    entity_id: !input event_sensor
+    to: "on"
+  - trigger: state
+    id: "t_event_off"
+    entity_id: !input event_sensor
+    to: "off"
+    for:
+      minutes: !input event_duration_extension
+
+variables:
+  # Input variables
+  cycle_type: !input cycle_type
+  start_time: !input start_time
+  end_time: !input end_time
+  cutoff_elevation: !input cutoff_elevation
+  day_entities: !input day_entities
+  night_entities: !input night_entities
+  event_sensor: !input event_sensor
+  event_trigger_mode: !input event_trigger_mode
+  event_start_scene_scripts: !input event_start_scene_scripts
+  event_end_scene_scripts: !input event_end_scene_scripts
+  event_lights_switches: !input event_lights_switches
+  event_duration_extension: !input event_duration_extension
+  fix_event_name: !input fix_event_name
+  # Split domain and entity_id
+  day_light_entities: >-
+    {% set a = day_entities.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'light') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  day_switch_entities: >-
+    {% set a = day_entities.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'switch') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  day_scene_entities: >-
+    {% set a = day_entities.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'scene') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  day_script_entities: >-
+    {% set a = day_entities.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'script') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  night_light_entities: >-
+    {% set a = night_entities.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'light') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  night_switch_entities: >-
+    {% set a = night_entities.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'switch') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  night_scene_entities: >-
+    {% set a = night_entities.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'scene') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  night_script_entities: >-
+    {% set a = night_entities.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'script') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  event_light_entities: >-
+    {% set a = event_lights_switches.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'light') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  event_switch_entities: >-
+    {% set a = event_lights_switches.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'switch') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  event_start_scene_entities: >-
+    {% set a = event_start_scene_scripts.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'scene') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  event_end_scene_entities: >-
+    {% set a = event_end_scene_scripts.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'scene') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  event_start_script_entities: >-
+    {% set a = event_start_scene_scripts.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'script') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  event_end_script_entities: >-
+    {% set a = event_end_scene_scripts.entity_id %}
+    {% if a %}
+      {{ expand(a) | selectattr('domain', 'eq', 'script') | map(attribute='entity_id') | list }}
+    {% else %}
+      []
+    {% endif %}
+  # Helper variables
+  now_time: "{{ now().strftime('%H:%M:%S') }}"
+  now_elevation: "{{ state_attr('sun.sun', 'elevation') }}"
+  is_night: >-
+    {% if cycle_type == 'time_enabled' and start_time < end_time %}
+      {{ start_time <= now_time and now_time < end_time }}
+    {% elif cycle_type == 'time_enabled' and start_time >= end_time %}
+      {{ now_time < end_time or start_time <= now_time }}
+    {% elif cycle_type == 'sun_enabled' %}
+      {{ now_elevation < cutoff_elevation }}
+    {% elif cycle_type == 'start_time_sun_enabled' %}
+      {{ now_elevation < cutoff_elevation or start_time <= now_time }}
+    {% elif cycle_type == 'end_time_sun_enabled' %}
+      {{ now_elevation < cutoff_elevation and now_time < end_time }}
+    {% else %}
+      false
+    {% endif %}
+  is_day_triggered: >-
+    {% if cycle_type in ['sun_enabled', 'start_time_sun_enabled'] %}
+      {{ trigger.id == 't_above_elevation' }}
+    {% elif cycle_type in ['time_enabled', 'end_time_sun_enabled'] %}
+      {{ trigger.id == 't_end_time' }}
+    {% else %}
+      false
+    {% endif %}
+  is_night_triggered: >-
+    {% if cycle_type in ['sun_enabled', 'end_time_sun_enabled'] %}
+      {{ trigger.id == 't_below_elevation' }}
+    {% elif cycle_type in ['time_enabled', 'start_time_sun_enabled'] %}
+      {{ trigger.id == 't_start_time' }}
+    {% else %}
+      false
+    {% endif %}
+  is_event_triggered: >-
+    {% if event_trigger_mode == 'day_enabled' %}
+      {{ trigger.id in ['t_event_on', 't_event_off'] and not is_night }}
+    {% elif event_trigger_mode == 'night_enabled' %}
+      {{ trigger.id in ['t_event_on', 't_event_off'] and is_night }}
+    {% else %}
+      {{ trigger.id in ['t_event_on', 't_event_off'] }}
+    {% endif %}
+  is_reset_triggered: "{{ trigger.id == 't_reset' }}"
+
+conditions:
+  - condition: template
+    value_template: "{{ is_day_triggered or is_night_triggered or is_event_triggered or is_reset_triggered}}"
+
+actions:
+  - choose:
+      - alias: "Event Triggered Action On"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 't_event_on' }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: "{{ event_start_scene_entities }}"
+          - action: script.turn_on
+            target:
+              entity_id: "{{ event_start_script_entities }}"
+          - action: light.turn_on
+            target:
+              entity_id: "{{ event_light_entities }}"
+          - action: switch.turn_on
+            target:
+              entity_id: "{{ event_switch_entities }}"
+      - alias: "Event Triggered Action Off"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 't_event_off' }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: "{{ event_end_scene_entities }}"
+          - action: script.turn_on
+            target:
+              entity_id: "{{ event_end_script_entities }}"
+          - action: light.turn_off
+            target:
+              entity_id: "{{ event_light_entities }}"
+          - action: switch.turn_off
+            target:
+              entity_id: "{{ event_switch_entities }}"
+          - event: day_night_control_with_event_reset
+            event_data: {}
+          - variables:
+              is_reset_triggered: true
+  - choose:
+      - alias: "Apply Day Mode"
+        conditions:
+          - condition: template
+            value_template: "{{ is_day_triggered or (is_reset_triggered and not is_night) }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: "{{ day_scene_entities }}"
+          - action: script.turn_on
+            target:
+              entity_id: "{{ day_script_entities }}"
+          - action: light.turn_on
+            target:
+              entity_id: "{{ day_light_entities }}"
+          - action: switch.turn_on
+            target:
+              entity_id: "{{ day_switch_entities }}"
+          - action: light.turn_off
+            target:
+              entity_id: "{{ night_light_entities }}"
+          - action: switch.turn_off
+            target:
+              entity_id: "{{ night_switch_entities }}"
+      - alias: "Apply Night Mode"
+        conditions:
+          - condition: template
+            value_template: "{{ is_night_triggered or (is_reset_triggered and is_night) }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: "{{ night_scene_entities }}"
+          - action: script.turn_on
+            target:
+              entity_id: "{{ night_script_entities }}"
+          - action: light.turn_on
+            target:
+              entity_id: "{{ night_light_entities }}"
+          - action: switch.turn_on
+            target:
+              entity_id: "{{ night_switch_entities }}"
+          - action: light.turn_off
+            target:
+              entity_id: "{{ day_light_entities }}"
+          - action: switch.turn_off
+            target:
+              entity_id: "{{ day_switch_entities }}"
