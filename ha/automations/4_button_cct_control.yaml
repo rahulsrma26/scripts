@@ -1,0 +1,398 @@
+blueprint:
+  name: 4-Button Scene Switch Light Control
+  description: >
+    **Version: 0.4.5**
+
+      Control light(s) with a 4-button scene switch (single/double click actions).
+
+      - **Left Upper**:
+
+        - 1_single: Toggles the light ON/OFF.
+
+        - 1_double: Sets the light to the Primary Profile (custom brightness and color temperature).
+
+      - **Left Lower**:
+
+        - 3_single: Change color temperature (cycles through defined steps).
+
+        - 3_double: Sets the light to the Secondary Profile (custom brightness and color temperature).
+
+      - **Right Upper**:
+
+        - 2_single: Increases brightness by a defined step.
+
+        - 2_double: Sets brightness to maximum and color temperature to coolest.
+
+      - **Right Lower**:
+
+        - 4_single: Decreases brightness by a defined step.
+
+        - 4_double: Sets brightness to minimum and color temperature to warmest.
+
+      - Brightness and color temperature steps, min/max, and profiles are fully configurable.
+
+      - Supports both absolute and percentage brightness, and both mired and kelvin for color temperature.
+
+      - The default values are for Tuya Zigbee GU10 bulb but can be adjusted for any light.
+
+  domain: automation
+  author: rahulsrma26
+
+  input:
+    devices:
+      name: Devices
+      icon: mdi:light-switch
+      description: >
+        Select the MQTT scene switch device and the target light(s) to control.
+        The scene switch device should support 4-button actions (single/double click).
+      collapsed: true
+      input:
+        switch_device:
+          name: Scene Switch Device *
+          description: The MQTT scene switch device
+          selector:
+            device:
+        target_light:
+          name: Target Light(s) *
+          description: The light to control
+          selector:
+            target:
+              entity:
+                domain:
+                  - light
+    brightness_control:
+      name: Brightness Control
+      icon: mdi:brightness-6
+      description: >
+        Configure the brightness control settings.
+      collapsed: true
+      input:
+        brightness_type:
+          name: Brightness Type
+          description: >
+            Select the type of brightness control.
+          default: brightness
+          selector:
+            select:
+              options:
+                - label: Absolute (brightness)
+                  value: "brightness"
+                - label: Percentage (brightness_pct)
+                  value: "brightness_pct"
+        brightness_min:
+          name: Brightness Min
+          description: Minimum brightness value
+          default: 2
+          selector:
+            number:
+              min: 1
+              max: 32767
+              step: 1
+        brightness_max:
+          name: Brightness Max
+          description: Maximum brightness value
+          default: 254
+          selector:
+            number:
+              min: 1
+              max: 32767
+              step: 1
+        brightness_steps:
+          name: Number of Brightness Steps
+          description: Number of steps for brightness control
+          default: 5
+          selector:
+            number:
+              min: 2
+              max: 10
+              step: 1
+              mode: slider
+    temperature_control:
+      name: Light Temperature Control
+      icon: mdi:lightbulb-night
+      description: >
+        Configure the color temperature control settings.
+      collapsed: true
+      input:
+        temp_type:
+          name: Temperature Type
+          description: >
+            Select the type of color temperature control.
+          default: color_temp
+          selector:
+            select:
+              options:
+                - label: Kelvin (color_temp_kelvin)
+                  value: "color_temp_kelvin"
+                - label: Mired (color_temp)
+                  value: "color_temp"
+        temp_warm:
+          name: Temperature Warmest Value
+          description: Warmest color temperature value
+          default: 500
+          selector:
+            number:
+              min: 1
+              max: 32767
+              step: 1
+        temp_cool:
+          name: Temperature Coolest Value
+          description: Coolest color temperature value
+          default: 142
+          selector:
+            number:
+              min: 1
+              max: 32767
+              step: 1
+        temp_steps:
+          name: Number of Temperature Steps
+          description: Number of steps for color temperature control
+          default: 5
+          selector:
+            number:
+              min: 2
+              max: 10
+              step: 1
+              mode: slider
+    primary_profile:
+      name: Primary Light Profile (Button 1)
+      icon: mdi:lightbulb-on-80
+      description: >
+        When button 1 is double pressed, then these values will be used to turn on the lights
+      input:
+        brightness_primary:
+          name: Default Brightness
+          description: Default brightness value for primary profile
+          default: 80
+          selector:
+            number:
+              min: 0
+              max: 100
+              mode: slider
+              step: 1
+              unit_of_measurement: '%'
+        temp_primary:
+          name: Default Temperature
+          description: Default color temperature value for primary profile (0 for warmest, 100 for coolest)
+          default: 60
+          selector:
+            number:
+              min: 0
+              max: 100
+              mode: slider
+              step: 1
+              unit_of_measurement: '%'
+    secondary_profile:
+      name: Secondary Light Profile (Button 3)
+      icon: mdi:lightbulb-on-40
+      description: >
+        When button 3 is double pressed, then these values will be used to turn on the lights
+      input:
+        brightness_secondary:
+          name: Default Brightness
+          description: Default brightness value for secondary profile
+          default: 20
+          selector:
+            number:
+              min: 0
+              max: 100
+              mode: slider
+              step: 1
+              unit_of_measurement: '%'
+        temp_secondary:
+          name: Default Temperature
+          description: Default color temperature value for secondary profile (0 for warmest, 100 for coolest)
+          default: 20
+          selector:
+            number:
+              min: 0
+              max: 100
+              mode: slider
+              step: 1
+              unit_of_measurement: '%'
+
+mode: restart
+
+triggers:
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: 1_single
+    id: "1_single"
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: 1_double
+    id: "1_double"
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: 2_single
+    id: "2_single"
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: 2_double
+    id: "2_double"
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: 3_single
+    id: "3_single"
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: 3_double
+    id: "3_double"
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: 4_single
+    id: "4_single"
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: 4_double
+    id: "4_double"
+
+variables:
+  target_light: !input target_light
+  brightness_type: !input brightness_type
+  brightness_min: !input brightness_min
+  brightness_max: !input brightness_max
+  brightness_steps: !input brightness_steps
+  brightness_primary: !input brightness_primary
+  brightness_secondary: !input brightness_secondary
+  temp_type: !input temp_type
+  temp_warm: !input temp_warm
+  temp_cool: !input temp_cool
+  temp_steps: !input temp_steps
+  temp_primary: !input temp_primary
+  temp_secondary: !input temp_secondary
+  first_light_entity: "{{ expand(target_light.entity_id) | map(attribute='entity_id') | first }}"
+  brightness_button1: "{{ brightness_min + (brightness_max - brightness_min) * brightness_primary / 100 | int }}"
+  brightness_button3: "{{ brightness_min + (brightness_max - brightness_min) * brightness_secondary / 100 | int }}"
+  temp_min: >-
+    {% if temp_warm < temp_cool %}
+      {{ temp_warm }}
+    {% else %}
+      {{ temp_cool }}
+    {% endif %}
+  temp_max: >-
+    {% if temp_warm < temp_cool %}
+      {{ temp_cool }}
+    {% else %}
+      {{ temp_warm }}
+    {% endif %}
+  temp_button1: >-
+    {% if temp_warm < temp_cool %}
+      {{ temp_warm + (temp_cool - temp_warm) * temp_primary / 100 | int }}
+    {% else %}
+      {{ temp_cool + (temp_warm - temp_cool) * (100 - temp_primary) / 100 | int }}
+    {% endif %}
+  temp_button3: >-
+    {% if temp_warm < temp_cool %}
+      {{ temp_warm + (temp_cool - temp_warm) * temp_secondary / 100 | int }}
+    {% else %}
+      {{ temp_cool + (temp_warm - temp_cool) * (100 - temp_secondary) / 100 | int }}
+    {% endif %}
+  brightness_now: "{{ state_attr(first_light_entity, brightness_type) | int(brightness_default) }}"
+  temp_now: "{{ state_attr(first_light_entity, temp_type) | int(temp_default) }}"
+
+action:
+  - choose:
+      - conditions: "{{ trigger.id == '1_single' }}"
+        sequence:
+          - action: light.toggle
+            target: !input target_light
+      - conditions: "{{ trigger.id == '1_double' }}"
+        sequence:
+          - variables:
+              light_data: >
+                {% set light = namespace(data={}) %}
+                {% set light.data = dict(light.data, **{ brightness_type: brightness_button1 }) %}
+                {% set light.data = dict(light.data, **{ temp_type: temp_button1 }) %}
+                {{ light.data }}
+          - action: light.turn_on
+            target: !input target_light
+            data: "{{ light_data }}"
+      - conditions: "{{ trigger.id == '2_single' }}"
+        sequence:
+          - variables:
+              brightness_new: >
+                {% set new = brightness_now + (brightness_max - brightness_min) / brightness_steps %}
+                {% if new > brightness_max %}{{ brightness_max }}{% else %}{{ new }}{% endif %}
+              light_data: >
+                {% set light = namespace(data={}) %}
+                {% set light.data = dict(light.data, **{ brightness_type: brightness_new }) %}
+                {{ light.data }}
+          - action: light.turn_on
+            target: !input target_light
+            data: "{{ light_data }}"
+      - conditions: "{{ trigger.id == '2_double' }}"
+        sequence:
+          - variables:
+              light_data: >
+                {% set light = namespace(data={}) %}
+                {% set light.data = dict(light.data, **{ brightness_type: brightness_max }) %}
+                {% set light.data = dict(light.data, **{ temp_type: temp_cool }) %}
+                {{ light.data }}
+          - action: light.turn_on
+            target: !input target_light
+            data: "{{ light_data }}"
+      - conditions: "{{ trigger.id == '4_single' }}"
+        sequence:
+          - variables:
+              brightness_new: >
+                {% set new = brightness_now - (brightness_max - brightness_min) / brightness_steps %}
+                {% if new < brightness_min %}{{ brightness_min }}{% else %}{{ new }}{% endif %}
+              light_data: >
+                {% set light = namespace(data={}) %}
+                {% set light.data = dict(light.data, **{ brightness_type: brightness_new }) %}
+                {{ light.data }}
+          - action: light.turn_on
+            target: !input target_light
+            data: "{{ light_data }}"
+      - conditions: "{{ trigger.id == '4_double' }}"
+        sequence:
+          - variables:
+              light_data: >
+                {% set light = namespace(data={}) %}
+                {% set light.data = dict(light.data, **{ brightness_type: brightness_min }) %}
+                {% set light.data = dict(light.data, **{ temp_type: temp_warm }) %}
+                {{ light.data }}
+          - action: light.turn_on
+            target: !input target_light
+            data: "{{ light_data }}"
+      - conditions: "{{ trigger.id == '3_single' }}"
+        sequence:
+          - variables:
+              temp_new: >
+                {% set new = temp_now + (temp_max - temp_min) / temp_steps %}
+                {% if new > temp_max %}{{ temp_min }}{% else %}{{ new }}{% endif %}
+              light_data: >
+                {% set light = namespace(data={}) %}
+                {% set light.data = dict(light.data, **{ temp_type: temp_new }) %}
+                {{ light.data }}
+          - action: light.turn_on
+            target: !input target_light
+            data: "{{ light_data }}"
+      - conditions: "{{ trigger.id == '3_double' }}"
+        sequence:
+          - variables:
+              light_data: >
+                {% set light = namespace(data={}) %}
+                {% set light.data = dict(light.data, **{ brightness_type: brightness_button3 }) %}
+                {% set light.data = dict(light.data, **{ temp_type: temp_button3 }) %}
+                {{ light.data }}
+          - action: light.turn_on
+            target: !input target_light
+            data: "{{ light_data }}"

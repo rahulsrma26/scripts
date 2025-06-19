@@ -1,0 +1,230 @@
+blueprint:
+  name: Manual Switch Control
+  description: >
+    **Version: 0.1.6**
+
+    This automation blueprint allows you to control a group of lights, switches, scenes, and scripts based on the state of a user-selected switch.
+
+    Additional features:
+
+    - **Auto-Off Option:** Optionally, the switch can automatically turn OFF after a specified number of minutes.
+
+    - **Manual Reset Event:** You can trigger a custom event (default: `smart_home_fix_request`) to re-apply the correct state to all targets, useful after Home Assistant restarts or for troubleshooting.
+
+    - **Flexible Target Selection:** You can independently configure which lights, switches, scenes, and scripts are controlled for both ON and OFF states.
+
+    <details>
+    <summary><b>How This Automation Works:</b> - Click to expand</summary>
+
+    - When the user switch is turned ON:
+
+      - Runs the configured ON scenes and scripts.
+
+      - Turns ON the configured ON lights and switches.
+
+      - Turns OFF the configured OFF lights and switches.
+
+    - When the user switch is turned OFF:
+
+      - Runs the configured OFF scenes and scripts.
+
+      - Turns OFF the configured ON lights and switches.
+
+      - Turns ON the configured OFF lights and switches.
+
+    - If auto-off is enabled, the switch will automatically turn OFF after the specified time.
+
+    - Triggering the manual reset event will re-run the actions to all targets based on the current switch state.
+
+    </details>
+    Required = *
+  domain: automation
+  author: rahulsrma26
+  input:
+    trigger_input:
+      name: Trigger Input
+      icon: mdi:toggle-switch
+      description: >
+        Select the type of trigger for the automation.
+        You can choose between a state change of a switch or an event trigger.
+      collapsed: true
+      input:
+        user_switch:
+          name: User Facing Switch *
+          description: The switch the user interacts with
+          selector:
+            entity:
+              filter:
+                - domain: switch
+        on_targets:
+          name: Entities for **ON** State
+          description: >-
+            Lights, switches that turn ON when the user switch is **ON** and turn OFF when the user switch is **OFF**.
+            Scenes and scripts will run on switch turn ON.
+          default: []
+          selector:
+            target:
+              entity:
+                domain:
+                  - light
+                  - switch
+                  - scene
+                  - script
+        off_targets:
+          name: Entities for **OFF** State
+          description: >-
+            Lights, switches that turn ON when the user switch is **OFF** and turn OFF when the user switch is **ON**.
+            Scenes and scripts will run on switch turn OFF.
+          default: []
+          selector:
+            target:
+              entity:
+                domain:
+                  - light
+                  - switch
+                  - scene
+                  - script
+    other_options:
+      name: Other Options
+      icon: mdi:cog-outline
+      description: >
+        Additional options for the automation.
+      collapsed: true
+      input:
+        use_auto_off:
+          name: Use Auto Off
+          description: >
+            Enable or disable the auto-off feature for the switch.
+            When enabled, the switch will automatically turn OFF after a specified time.
+          default: false
+          selector:
+            boolean:
+        auto_off_time:
+          name: Auto Off Time
+          description: >
+            The maximum time in minutes the switch can remain ON before it is automatically turned OFF.
+            This is useful to prevent lights from being left on indefinitely.
+          default: "01:00:00"
+          selector:
+            time:
+        fix_event_name:
+          name: Fix Event Name
+          description: >
+            This option can be used to trigger based on custom event to fix when the automation is restarted.
+            It ensures that the event trigger is set correctly based on the state.
+          default: "smart_home_fix_request"
+          selector:
+            text:
+
+mode: restart
+
+trigger:
+  - trigger: event
+    event_type: !input fix_event_name
+    id: "t_reset"
+  - trigger: state
+    id: "t_switch_on"
+    entity_id: !input user_switch
+    to: "on"
+  - trigger: state
+    id: "t_switch_off"
+    entity_id: !input user_switch
+    to: "off"
+  - trigger: state
+    id: "t_switch_auto_off"
+    entity_id: !input user_switch
+    to: "on"
+    for: !input auto_off_time
+
+variables:
+  user_switch: !input user_switch
+  on_targets: !input on_targets
+  off_targets: !input off_targets
+  use_auto_off: !input use_auto_off
+  auto_off_time: !input auto_off_time
+  fix_event_name: !input fix_event_name
+
+  on_lights: >-
+    {% set a = on_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'light') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  on_switches: >-
+    {% set a = on_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'switch') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  on_scenes: >-
+    {% set a = on_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'scene') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  on_scripts: >-
+    {% set a = on_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'script') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+
+  off_lights: >-
+    {% set a = off_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'light') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  off_switches: >-
+    {% set a = off_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'switch') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  off_scenes: >-
+    {% set a = off_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'scene') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  off_scripts: >-
+    {% set a = off_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'script') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+
+  switch_state: "{{ states(user_switch) }}"
+
+action:
+  - choose:
+      - alias: "Switch turned ON or Fix Event and switch is ON"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 't_switch_on' or (trigger.id == 't_reset' and switch_state == 'on') }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: "{{ on_scenes }}"
+          - action: script.turn_on
+            target:
+              entity_id: "{{ on_scripts }}"
+          - action: light.turn_on
+            target:
+              entity_id: "{{ on_lights }}"
+          - action: switch.turn_on
+            target:
+              entity_id: "{{ on_switches }}"
+          - action: light.turn_off
+            target:
+              entity_id: "{{ off_lights }}"
+          - action: switch.turn_off
+            target:
+              entity_id: "{{ off_switches }}"
+      - alias: "Switch turned OFF or Fix Event and switch is OFF"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 't_switch_off' or (trigger.id == 't_reset' and switch_state == 'off') }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: "{{ off_scenes }}"
+          - action: script.turn_on
+            target:
+              entity_id: "{{ off_scripts }}"
+          - action: light.turn_off
+            target:
+              entity_id: "{{ on_lights }}"
+          - action: switch.turn_off
+            target:
+              entity_id: "{{ on_switches }}"
+          - action: light.turn_on
+            target:
+              entity_id: "{{ off_lights }}"
+          - action: switch.turn_on
+            target:
+              entity_id: "{{ off_switches }}"
+      - alias: "Switch Auto Off"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 't_switch_auto_off' and use_auto_off }}"
+        sequence:
+          - action: switch.turn_off
+            target:
+              entity_id: "{{ user_switch }}"

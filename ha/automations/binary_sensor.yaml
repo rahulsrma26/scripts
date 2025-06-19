@@ -1,0 +1,210 @@
+blueprint:
+  name: Binary sensor control
+  description: >
+    **Version: 0.1.1**
+
+    This automation blueprint allows you to control a group of lights, switches, scenes, and scripts based on the state of a binary sensor.
+
+
+    Additional features:
+
+    - **Delayed OFF Option:** Optionally, actions for the OFF state can be delayed by a specified time.
+
+    - **Manual Reset Event:** You can trigger a custom event (default: `smart_home_fix_request`) to re-apply the correct state to all targets, useful after Home Assistant restarts or for troubleshooting.
+
+    - **Flexible Target Selection:** You can independently configure which lights, switches, scenes, and scripts are controlled for both ON and OFF states.
+
+    <details>
+    <summary><b>How This Automation Works:</b> - Click to expand</summary>
+
+
+    - When the user sensor turns ON:
+
+      - Runs the configured ON scenes and scripts.
+
+      - Turns ON the configured ON lights and switches.
+
+      - Turns OFF the configured OFF lights and switches.
+
+
+    - When the user sensor turns OFF (optionally after a delay):
+
+      - Runs the configured OFF scenes and scripts.
+
+      - Turns OFF the configured ON lights and switches.
+
+      - Turns ON the configured OFF lights and switches.
+
+    - If a delayed OFF time is set, OFF actions will be executed after the specified delay.
+
+    - Triggering the manual reset event will re-run the actions based on the current state of the user sensor.
+
+    </details>
+    Required = *
+  domain: automation
+  author: rahulsrma26
+  input:
+    trigger_input:
+      name: Trigger Input
+      icon: mdi:motion-sensor
+      description: >
+        Select the type of trigger for the automation.
+        You can choose between a state change of a switch or an event trigger.
+      collapsed: true
+      input:
+        user_sensor:
+          name: User Facing Sensor *
+          description: The binary sensor the user interacts with
+          selector:
+            entity:
+              filter:
+                - domain: binary_sensor
+        on_targets:
+          name: Entities for **ON** State
+          description: >-
+            Lights, switches that turn ON when the user sensor is **ON** and turn OFF when the user sensor is **OFF**.
+            Scenes and scripts will run on when sensor turns ON.
+          default: []
+          selector:
+            target:
+              entity:
+                domain:
+                  - light
+                  - switch
+                  - scene
+                  - script
+        off_targets:
+          name: Entities for **OFF** State
+          description: >-
+            Lights, switches that turn ON when the user sensor is **OFF** and turn OFF when the user sensor is **ON**.
+            Scenes and scripts will run on when sensor turns OFF.
+          default: []
+          selector:
+            target:
+              entity:
+                domain:
+                  - light
+                  - switch
+                  - scene
+                  - script
+    other_options:
+      name: Other Options
+      icon: mdi:cog-outline
+      description: >
+        Additional options for the automation.
+      collapsed: true
+      input:
+        delayed_off_time:
+          name: Delayed Off Time
+          description: >
+            This option can be used to delay the OFF actions of the user sensor.
+          default: "00:00:00"
+          selector:
+            time:
+        fix_event_name:
+          name: Fix Event Name
+          description: >
+            This option can be used to trigger based on custom event to fix when the automation is restarted.
+            It ensures that the event trigger is set correctly based on the state.
+          default: "smart_home_fix_request"
+          selector:
+            text:
+
+mode: restart
+
+trigger:
+  - trigger: event
+    event_type: !input fix_event_name
+    id: "t_reset"
+  - trigger: state
+    id: "t_sensor_on"
+    entity_id: !input user_sensor
+    to: "on"
+  - trigger: state
+    id: "t_sensor_off"
+    entity_id: !input user_sensor
+    to: "off"
+    for: !input delayed_off_time
+
+variables:
+  user_sensor: !input user_sensor
+  on_targets: !input on_targets
+  off_targets: !input off_targets
+  fix_event_name: !input fix_event_name
+
+  on_lights: >-
+    {% set a = on_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'light') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  on_switches: >-
+    {% set a = on_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'switch') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  on_scenes: >-
+    {% set a = on_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'scene') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  on_scripts: >-
+    {% set a = on_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'script') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+
+  off_lights: >-
+    {% set a = off_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'light') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  off_switches: >-
+    {% set a = off_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'switch') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  off_scenes: >-
+    {% set a = off_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'scene') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+  off_scripts: >-
+    {% set a = off_targets.entity_id %}
+    {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'script') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
+
+  sensor_state: "{{ states(user_sensor) }}"
+
+action:
+  - choose:
+      - alias: "Sensor turned ON or Fix Event and sensor is ON"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 't_sensor_on' or (trigger.id == 't_reset' and sensor_state == 'on') }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: "{{ on_scenes }}"
+          - action: script.turn_on
+            target:
+              entity_id: "{{ on_scripts }}"
+          - action: light.turn_on
+            target:
+              entity_id: "{{ on_lights }}"
+          - action: switch.turn_on
+            target:
+              entity_id: "{{ on_switches }}"
+          - action: light.turn_off
+            target:
+              entity_id: "{{ off_lights }}"
+          - action: switch.turn_off
+            target:
+              entity_id: "{{ off_switches }}"
+      - alias: "Switch turned OFF or Fix Event and switch is OFF"
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 't_sensor_off' or (trigger.id == 't_reset' and sensor_state == 'off') }}"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: "{{ off_scenes }}"
+          - action: script.turn_on
+            target:
+              entity_id: "{{ off_scripts }}"
+          - action: light.turn_off
+            target:
+              entity_id: "{{ on_lights }}"
+          - action: switch.turn_off
+            target:
+              entity_id: "{{ on_switches }}"
+          - action: light.turn_on
+            target:
+              entity_id: "{{ off_lights }}"
+          - action: switch.turn_on
+            target:
+              entity_id: "{{ off_switches }}"

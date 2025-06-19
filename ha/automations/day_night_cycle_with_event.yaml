@@ -3,7 +3,7 @@ blueprint:
   description: >
     # Day/Night Cycle with Event Trigger
 
-    **Version: 0.3.4**
+    **Version: 0.4.3**
 
     This automation allows you to control the day/night cycle based on sun elevation or specific times, with an optional event trigger for additional actions.
 
@@ -11,18 +11,25 @@ blueprint:
     <summary><b>How This Automation Works:</b> - Click to expand</summary>
 
     - **Day/Night Mode:**
+
       - Automatically switches between day and night modes using either sun elevation or specific times.
+
       - Runs configured scenes/scripts and controls lights/switches for each mode.
 
     - **Event Trigger:**
+
       - When the event entity (e.g., doorbell, motion sensor) turns ON, runs the configured event scenes/scripts and turns on event lights/switches.
+
       - When the event entity turns OFF, runs the configured "event end" scenes/scripts and turns off event lights/switches after an optional delay.
 
     - **Manual Reset:**
+
       - Supports a manual event (`smart_home_fix_request`) to re-apply the correct mode after Home Assistant restarts or for troubleshooting.
 
     - **Flexible Configuration:**
+
       - Supports both sun and time triggers for day/night switching.
+
       - Allows separate configuration for scenes/scripts and lights/switches for day, night, and event triggers.
 
     </details>
@@ -47,20 +54,18 @@ blueprint:
               options:
                 - label: Night will be Start <= Current < End Time
                   value: "time_enabled"
-                - label: Night will be Current < Cutoff elevation
+                - label: Night will be Current evevation < Cutoff
                   value: "sun_enabled"
-                - label: Night will be Start Time <= Current or Current < Sun elevation
-                  value: "start_time_sun_enabled"
-                - label: Night will be Current < Sun elevation and Current < End Time
-                  value: "end_time_sun_enabled"
+                - label: Night will be Start <= Current < End Time and Current evevation < Cutoff
+                  value: "time_sun_enabled"
         start_time:
-          name: Start Time
+          name: Night Start Time
           description: Set the time for Start Time (for option 1 and 3)
           default: "06:00:00"
           selector:
             time:
         end_time:
-          name: End Time
+          name: Night End Time
           description: Set the time for End Time (for option 1 and 4)
           default: "22:00:00"
           selector:
@@ -355,31 +360,35 @@ variables:
   now_time: "{{ now().strftime('%H:%M:%S') }}"
   now_elevation: "{{ state_attr('sun.sun', 'elevation') }}"
   is_night: >-
-    {% if cycle_type == 'time_enabled' and start_time < end_time %}
-      {{ start_time <= now_time and now_time < end_time }}
-    {% elif cycle_type == 'time_enabled' and start_time >= end_time %}
-      {{ now_time < end_time or start_time <= now_time }}
+    {% if cycle_type == 'time_enabled' %}
+      {% if start_time < end_time %}
+        {{ start_time <= now_time and now_time < end_time }}
+      {% else %}
+        {{ now_time < end_time or start_time <= now_time }}
+      {% endif %}
     {% elif cycle_type == 'sun_enabled' %}
       {{ now_elevation < cutoff_elevation }}
-    {% elif cycle_type == 'start_time_sun_enabled' %}
-      {{ now_elevation < cutoff_elevation or start_time <= now_time }}
-    {% elif cycle_type == 'end_time_sun_enabled' %}
-      {{ now_elevation < cutoff_elevation and now_time < end_time }}
+    {% elif cycle_type == 'time_sun_enabled' %}
+      {% if start_time < end_time %}
+        {{ (start_time <= now_time and now_time < end_time) and now_elevation < cutoff_elevation }}
+      {% else %}
+        {{ (now_time < end_time or start_time <= now_time) and now_elevation < cutoff_elevation }}
+      {% endif %}
     {% else %}
       false
     {% endif %}
   is_day_triggered: >-
-    {% if cycle_type in ['sun_enabled', 'start_time_sun_enabled'] %}
+    {% if cycle_type in ['sun_enabled', 'time_sun_enabled'] %}
       {{ trigger.id == 't_above_elevation' }}
-    {% elif cycle_type in ['time_enabled', 'end_time_sun_enabled'] %}
+    {% elif cycle_type in ['time_enabled', 'time_sun_enabled'] %}
       {{ trigger.id == 't_end_time' }}
     {% else %}
       false
     {% endif %}
   is_night_triggered: >-
-    {% if cycle_type in ['sun_enabled', 'end_time_sun_enabled'] %}
+    {% if cycle_type in ['sun_enabled', 'time_sun_enabled'] %}
       {{ trigger.id == 't_below_elevation' }}
-    {% elif cycle_type in ['time_enabled', 'start_time_sun_enabled'] %}
+    {% elif cycle_type in ['time_enabled', 'time_sun_enabled'] %}
       {{ trigger.id == 't_start_time' }}
     {% else %}
       false
