@@ -3,7 +3,7 @@ blueprint:
   description: >
     # Day/Night Cycle with Event Trigger
 
-    **Version: 0.4.3**
+    **Version: 0.4.5**
 
     This automation allows you to control the day/night cycle based on sun elevation or specific times, with an optional event trigger for additional actions.
 
@@ -54,9 +54,9 @@ blueprint:
               options:
                 - label: Night will be Start <= Current < End Time
                   value: "time_enabled"
-                - label: Night will be Current evevation < Cutoff
+                - label: Night will be Current elevation < Cutoff
                   value: "sun_enabled"
-                - label: Night will be Start <= Current < End Time and Current evevation < Cutoff
+                - label: Night will be Start <= Current < End Time and Current elevation < Cutoff
                   value: "time_sun_enabled"
         start_time:
           name: Night Start Time
@@ -378,18 +378,22 @@ variables:
       false
     {% endif %}
   is_day_triggered: >-
-    {% if cycle_type in ['sun_enabled', 'time_sun_enabled'] %}
+    {% if cycle_type == 'sun_enabled' %}
       {{ trigger.id == 't_above_elevation' }}
-    {% elif cycle_type in ['time_enabled', 'time_sun_enabled'] %}
+    {% elif cycle_type == 'time_enabled' %}
       {{ trigger.id == 't_end_time' }}
+    {% elif cycle_type == 'time_sun_enabled' %}
+      {{ trigger.id in ['t_above_elevation', 't_end_time'] }}
     {% else %}
       false
     {% endif %}
   is_night_triggered: >-
-    {% if cycle_type in ['sun_enabled', 'time_sun_enabled'] %}
+    {% if cycle_type == 'sun_enabled' %}
       {{ trigger.id == 't_below_elevation' }}
-    {% elif cycle_type in ['time_enabled', 'time_sun_enabled'] %}
+    {% elif cycle_type == 'time_enabled' %}
       {{ trigger.id == 't_start_time' }}
+    {% elif cycle_type == 'time_sun_enabled' %}
+      {{ trigger.id in ['t_below_elevation', 't_start_time'] }}
     {% else %}
       false
     {% endif %}
@@ -451,7 +455,7 @@ actions:
       - alias: "Apply Day Mode"
         conditions:
           - condition: template
-            value_template: "{{ is_day_triggered or (is_reset_triggered and not is_night) }}"
+            value_template: "{{ (is_day_triggered or is_reset_triggered) and not is_night }}"
         sequence:
           - action: scene.turn_on
             target:
@@ -474,7 +478,7 @@ actions:
       - alias: "Apply Night Mode"
         conditions:
           - condition: template
-            value_template: "{{ is_night_triggered or (is_reset_triggered and is_night) }}"
+            value_template: "{{ (is_night_triggered or is_reset_triggered) and is_night }}"
         sequence:
           - action: scene.turn_on
             target:

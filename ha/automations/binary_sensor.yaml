@@ -1,10 +1,9 @@
 blueprint:
   name: Binary sensor control
   description: >
-    **Version: 0.1.1**
+    **Version: 0.2.5**
 
-    This automation blueprint allows you to control a group of lights, switches, scenes, and scripts based on the state of a binary sensor.
-
+    This automation blueprint allows you to control a group of lights, switches, scenes, and scripts based on the state of a binary sensor, with optional lux (illuminance) sensor integration for smarter control.
 
     Additional features:
 
@@ -14,11 +13,12 @@ blueprint:
 
     - **Flexible Target Selection:** You can independently configure which lights, switches, scenes, and scripts are controlled for both ON and OFF states.
 
+    - **Lux Sensor Integration:** Optionally specify a lux (illuminance) sensor and a cutoff value. Lights and switches will only turn ON if the lux value is below the cutoff, allowing for daylight-aware automation.
+
     <details>
     <summary><b>How This Automation Works:</b> - Click to expand</summary>
 
-
-    - When the user sensor turns ON:
+    - When the user sensor turns ON **and** the lux value is below the cutoff (or no lux sensor is set):
 
       - Runs the configured ON scenes and scripts.
 
@@ -26,8 +26,7 @@ blueprint:
 
       - Turns OFF the configured OFF lights and switches.
 
-
-    - When the user sensor turns OFF (optionally after a delay):
+    - When the user sensor turns OFF (optionally after a delay), **or** the lux value rises above the cutoff:
 
       - Runs the configured OFF scenes and scripts.
 
@@ -37,7 +36,7 @@ blueprint:
 
     - If a delayed OFF time is set, OFF actions will be executed after the specified delay.
 
-    - Triggering the manual reset event will re-run the actions based on the current state of the user sensor.
+    - Triggering the manual reset event will re-run the actions based on the current state of the user sensor and lux sensor.
 
     </details>
     Required = *
@@ -98,7 +97,8 @@ blueprint:
           name: Delayed Off Time
           description: >
             This option can be used to delay the OFF actions of the user sensor.
-          default: "00:00:00"
+            This is useful for scenarios where sensors may briefly turn OFF and you want to avoid flickering.
+          default: "00:00:05"
           selector:
             time:
         fix_event_name:
@@ -109,6 +109,27 @@ blueprint:
           default: "smart_home_fix_request"
           selector:
             text:
+        lux_sensor:
+          name: Lux Sensor
+          description: >
+            Optional lux sensor to check the light level before turning ON lights.
+            If not set, lights will always turn ON.
+          default: []
+          selector:
+            entity:
+              filter:
+                domain: sensor
+                device_class: illuminance
+        lux_cutoff:
+          name: Lux Cutoff
+          description: >
+            Optional lux cutoff value to check the light level before turning ON lights.
+          default: 20
+          selector:
+            number:
+              min: 1
+              max: 1000
+              unit_of_measurement: lux
 
 mode: restart
 
@@ -125,12 +146,22 @@ trigger:
     entity_id: !input user_sensor
     to: "off"
     for: !input delayed_off_time
+  - trigger: numeric_state
+    id: "t_lux_above_cutoff"
+    entity_id: !input lux_sensor
+    above: !input lux_cutoff
+  - trigger: numeric_state
+    id: "t_lux_below_cutoff"
+    entity_id: !input lux_sensor
+    below: !input lux_cutoff
 
 variables:
   user_sensor: !input user_sensor
   on_targets: !input on_targets
   off_targets: !input off_targets
   fix_event_name: !input fix_event_name
+  lux_sensor: !input lux_sensor
+  lux_cutoff: !input lux_cutoff
 
   on_lights: >-
     {% set a = on_targets.entity_id %}
@@ -158,14 +189,21 @@ variables:
     {% set a = off_targets.entity_id %}
     {% if a %}{{ expand(a) | selectattr('domain', 'eq', 'script') | map(attribute='entity_id') | list }}{% else %}[]{% endif %}
 
+  lux_now: "{{ 0 if lux_sensor == [] else states(lux_sensor) | int }}"
+  is_lux_above: "{{ false if lux_sensor == [] else lux_now > lux_cutoff }}"
+  is_lux_below: "{{ true if lux_sensor == [] else lux_now <= lux_cutoff }}"
+
   sensor_state: "{{ states(user_sensor) }}"
+
+  apply_on: "{{ is_lux_below and sensor_state == 'on' }}"
+  apply_off: "{{ is_lux_above or sensor_state == 'off' }}"
 
 action:
   - choose:
       - alias: "Sensor turned ON or Fix Event and sensor is ON"
         conditions:
           - condition: template
-            value_template: "{{ trigger.id == 't_sensor_on' or (trigger.id == 't_reset' and sensor_state == 'on') }}"
+            value_template: "{{ apply_on }}"
         sequence:
           - action: scene.turn_on
             target:
@@ -188,7 +226,7 @@ action:
       - alias: "Switch turned OFF or Fix Event and switch is OFF"
         conditions:
           - condition: template
-            value_template: "{{ trigger.id == 't_sensor_off' or (trigger.id == 't_reset' and sensor_state == 'off') }}"
+            value_template: "{{ apply_off }}"
         sequence:
           - action: scene.turn_on
             target:

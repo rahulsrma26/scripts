@@ -1,0 +1,147 @@
+blueprint:
+  name: Update Helper Boolean Based on Other Boolean Sensor(s)/Switch(es)
+  description: >
+    **Version: 0.2.0**
+
+    This automation blueprint updates an input boolean helper based on the state of one or more binary sensors or switches, with optional delayed ON and OFF functionality.
+
+      Additional features:
+
+      - **Delayed ON/OFF Options:** Optionally delay turning ON or OFF the input boolean helper by a specified time to prevent flickering from brief sensor state changes or to introduce a delay before activation.
+
+      - **Manual Reset Event:** Trigger a custom event (default: `smart_home_fix_request`) to re-apply the correct state to the input boolean, useful after Home Assistant restarts or for troubleshooting.
+
+      - **Flexible ON/OFF Logic:** Choose whether the input boolean turns ON/OFF when all or any of the selected sensors or switches are ON/OFF.
+
+      <details>
+      <summary><b>How This Automation Works:</b> - Click to expand</summary>
+
+      - When the selected logic condition is met (e.g., any sensor ON, all sensors OFF), the input boolean helper is turned ON or OFF accordingly.
+
+      - If a delayed ON or OFF time is set, turning ON or OFF the input boolean will be delayed by the specified duration.
+
+      - Triggering the manual reset event will re-evaluate the sensors and set the input boolean to the correct state.
+
+    </details>
+    Required = *
+  domain: automation
+  author: rahulsrma26
+  input:
+    trigger_input:
+      name: Binary Sensor(s) / Switch(es) *
+      description: >
+        Select one or more binary sensors or switches to monitor.
+        The input boolean helper will be updated based on their state.
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+            - domain: switch
+          multiple: true
+    on_type:
+      name: Turn ON When
+      description: >
+        Select how the boolean helper should be updated when the sensor(s) turn ON.
+      default: any_on
+      selector:
+        select:
+          options:
+            - label: All Binary Sensors ON
+              value: all_on
+            - label: Any Binary Sensor ON
+              value: any_on
+            - label: All Binary Sensors OFF
+              value: all_off
+            - label: Any Binary Sensor OFF
+              value: any_off
+    target_boolean:
+      name: Target Boolean Helper *
+      description: The input boolean helper to update based on the sensor state
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    delayed_on_time:
+      name: Delayed ON Time
+      description: >
+        Optional delay before turning ON the boolean helper.
+        If not set, the boolean will turn ON immediately when the sensor turns ON.
+        Useful to be used as an off time for inverted sensors.
+      default: "00:00:00"
+      selector:
+        time:
+    delayed_off_time:
+      name: Delayed OFF Time
+      description: >
+        Optional delay before turning OFF the boolean helper.
+        If not set, the boolean will turn OFF immediately when the sensor turns OFF.
+        This is useful for scenarios where sensors may briefly turn OFF and you want to avoid flickering.
+      default: "00:00:05"
+      selector:
+        time:
+    fix_event_name:
+      name: Fix Event Name
+      description: >
+        This option can be used to trigger based on custom event to fix when the automation is restarted.
+        It ensures that the event trigger is set correctly based on the state.
+      default: "smart_home_fix_request"
+      selector:
+        text:
+
+mode: restart
+
+trigger:
+  - trigger: event
+    event_type: !input fix_event_name
+    id: "t_reset"
+  - trigger: state
+    id: "t_sensor_on"
+    entity_id: !input trigger_input
+    to: "on"
+    for: !input delayed_on_time
+  - trigger: state
+    id: "t_sensor_off"
+    entity_id: !input trigger_input
+    to: "off"
+    for: !input delayed_off_time
+
+variables:
+  trigger_input: !input trigger_input
+  on_type: !input on_type
+  target_boolean: !input target_boolean
+
+  target_state: "{{ states(target_boolean) }}"
+  all_inputs: "{{ trigger_input | length }}"
+  on_inputs: "{{ expand(trigger_input) | selectattr('state', 'eq', 'on') | list | length }}"
+  off_inputs: "{{ expand(trigger_input) | selectattr('state', 'eq', 'off') | list | length }}"
+  apply_on: >
+    {% if on_type == 'all_on' %}
+      {{ on_inputs == all_inputs }}
+    {% elif on_type == 'any_on' %}
+      {{ on_inputs > 0 }}
+    {% elif on_type == 'all_off' %}
+      {{ off_inputs == all_inputs }}
+    {% elif on_type == 'any_off' %}
+      {{ off_inputs > 0 }}
+    {% else %}
+      false
+    {% endif %}
+
+action:
+  - choose:
+      - alias: "Turn input boolean ON"
+        conditions:
+          - condition: template
+            value_template: "{{ target_state == 'off' and apply_on }}"
+        sequence:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: "{{ target_boolean }}"
+      - alias: "Turn input boolean OFF"
+        conditions:
+          - condition: template
+            value_template: "{{ target_state == 'on' and not apply_on }}"
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: "{{ target_boolean }}"
